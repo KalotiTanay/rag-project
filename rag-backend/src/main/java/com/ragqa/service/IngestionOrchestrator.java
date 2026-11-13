@@ -19,7 +19,7 @@ public class IngestionOrchestrator {
     private final DocumentRepository documentRepository;
     private final IngestionPipeline ingestionPipeline;
 
-    @Async
+    @Async("ingestionTaskExecutor")
     public void processDocumentAsync(UUID documentId) {
 
         MDC.put("documentId", documentId.toString());
