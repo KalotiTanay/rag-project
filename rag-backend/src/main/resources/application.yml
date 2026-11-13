@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: rag-backend
+  profiles:
+    active: local
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
+server:
+  port: 8080
+
+rag:
+  ingestion:
+    max-file-size-mb: 25
+    allowed-file-types:
+      - pdf
+      - txt
+      - md
+  chunking:
+    chunk-size-tokens: 500
+    chunk-overlap-tokens: 50
+  retrieval:
+    top-k: 5
+    similarity-threshold: 0.75
+  embedding:
+    model: text-embedding-3-small
+    base-url: https://api.openai.com/v1
+    batch-size: 100
+    dimensions: 1536
+  llm:
+    model: claude-sonnet-4-5
+    base-url: https://api.anthropic.com/v1
+    anthropic-version: "2023-06-01"
+    max-tokens: 1024
+  storage:
+    local-path: ./data/uploads
+  debug:
+    chunk-inspection-enabled: true
+    retrieval-debug-enabled: true
