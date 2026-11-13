@@ -1,17 +1,21 @@
 package com.ragqa.service;
 
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.ragqa.exception.DocumentNotFoundException;
 import com.ragqa.model.Document;
 import com.ragqa.model.DocumentStatus;
 import com.ragqa.repository.DocumentRepository;
 import com.ragqa.storage.FileStorageService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -28,19 +32,29 @@ public class DocumentService {
     public Document uploadDocument(MultipartFile file) {
         fileValidator.validate(file);
 
-        Document document = new Document();
-        document.setFilename(file.getOriginalFilename());
-        document.setOwnerId(DEFAULT_OWNER);
-        document.setStatus(DocumentStatus.PROCESSING);
+        String storageKey = fileStorageService.store(file, UUID.randomUUID());
 
-        document = documentRepository.save(document);
+        Document saved;
+        try {
+            Document document = new Document();
+            document.setFilename(file.getOriginalFilename());
+            document.setStorageKey(storageKey);
+            document.setOwnerId(DEFAULT_OWNER);
+            document.setStatus(DocumentStatus.PROCESSING);
+            saved = documentRepository.saveAndFlush(document);
+        } catch (RuntimeException e) {
+            fileStorageService.delete(storageKey);
+            throw e;
+        }
 
-        String storageKey = fileStorageService.store(file, document.getId());
-        document.setStorageKey(storageKey);
-        document = documentRepository.save(document);
-
-        ingestionOrchestrator.processDocumentAsync(document.getId());
-        return document;
+        UUID documentId = saved.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                ingestionOrchestrator.processDocumentAsync(documentId);
+            }
+        });
+        return saved;
     }
 
     @Transactional(readOnly = true)
